@@ -86,13 +86,16 @@ This is validated end-to-end against the real engines on a tiny parquet; see
   drivers shim it out (`lib/nosudo/`) with zero effect on hot scores. Set
   `BENCH_REAL_DROP_CACHES=1` to restore real cold runs (that needs passwordless
   sudo for `tee /proc/sys/vm/drop_caches`).
-- A few **one-time** `sudo` prompts may still appear at first install (DataFusion's
-  Rust/`gcc` build deps, Polars/Hyper's `python3-venv`, DuckDB's `/usr/local/bin`
-  symlink). Pre-install the deps above to skip most.
-- **Scenario-2 native ClickHouse and CrateDB still use `sudo`** to manage their
-  daemons (system install + a per-query restart under the vanilla cold-run rules).
-  Those two are the only remaining sudo users; run them under a warmed `sudo -v`
-  session, or ask for the rootless (user-mode) overrides.
+- **Scenario-2 ClickHouse and CrateDB run rootless** (user-mode), so they need
+  no daemon sudo: `scenario-2-native/rootless/` swaps in a clickhouse-server run
+  as your user (local data dir + config, parquet read in place) and CrateDB from
+  its tarball (`bin/crate`, not apt/systemctl). The vanilla per-query restart is
+  preserved. Both are validated end-to-end including cross-restart persistence.
+- The only remaining `sudo` is a few **one-time** install prompts: DuckDB's
+  `/usr/local/bin/duckdb` symlink, CrateDB's `postgresql-client` (psql) if absent,
+  and (vanilla DataFusion's) Rust/`gcc`. Pre-installing `python3-venv gcc git
+  postgresql-client` and symlinking duckdb yourself avoids all of them — none are
+  per-query, so passwordless sudo is never required.
 - Disk: the parquet dataset is ~15 GB; QuestDB's CSV load needs ~70 GB
   uncompressed transiently. Budget ~120 GB free.
 - Engines install on first run: vanilla via ClickBench's own per-engine
@@ -162,5 +165,6 @@ scenario-1-parquet/
 scenario-2-native/
   run.sh                      original / keep-alive / warmup driver
   modified/duckdb/            keep-alive overlay (only fresh-process engine here)
+  rootless/{clickhouse,cratedb}/   user-mode (no-sudo) daemon overrides
   results/{original,modified,warmup}/
 ```

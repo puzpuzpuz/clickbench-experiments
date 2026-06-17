@@ -44,7 +44,8 @@ if [ -z "${BENCH_REAL_DROP_CACHES:-}" ]; then
     export PATH="$here/../lib/nosudo:$PATH"
 fi
 
-has_overlay() { [ -d "$here/modified/$1" ]; }
+has_overlay()  { [ -d "$here/modified/$1" ]; }   # DuckDB keep-alive
+has_rootless() { [ -d "$here/rootless/$1" ]; }   # ClickHouse/CrateDB user-mode (no sudo)
 
 apply_overlay() {
     local engine="$1"
@@ -58,6 +59,24 @@ reset_overlay() {
     git -C "$CB" checkout --quiet -- "$engine" lib 2>/dev/null || true
     rm -f "$CB/lib/fifo-repl.sh" "$CB/lib/repl-engine.py" \
           "$CB/$engine/repl.env" "$CB/$engine/".cb_* 2>/dev/null || true
+}
+
+apply_rootless() {
+    local engine="$1" f
+    for f in "$here/rootless/$engine/"*; do
+        cp "$f" "$CB/$engine/"
+        chmod +x "$CB/$engine/$(basename "$f")"
+    done
+}
+
+reset_rootless() {
+    local engine="$1"
+    git -C "$CB" checkout --quiet -- "$engine" 2>/dev/null || true
+    # Drop the user-mode runtime state so each pass loads fresh; keep the
+    # downloaded engine binary (./clickhouse, crate/) to avoid re-downloading.
+    rm -rf "$CB/$engine/ch-data" "$CB/$engine/ch-tmp" "$CB/$engine/ch-logs" \
+           "$CB/$engine/ch-config.yaml" "$CB/$engine/ch-users.yaml" "$CB/$engine/ch.pid" \
+           "$CB/$engine/crate-data" "$CB/$engine/crate-logs" "$CB/$engine/crate.pid" 2>/dev/null || true
 }
 
 run_phase() {
@@ -74,7 +93,11 @@ run_phase() {
         warmup)   has_overlay "$engine" && overlay=yes; tries="$WARMUP_TRIES"; collapse=(--collapse-hot) ;;
     esac
 
-    echo ">>> [$pass] $engine (tries=$tries, overlay=$overlay)"
+    local rootless=no
+    has_rootless "$engine" && rootless=yes
+
+    echo ">>> [$pass] $engine (tries=$tries, keepalive=$overlay, rootless=$rootless)"
+    [ "$rootless" = yes ] && apply_rootless "$engine"
     [ "$overlay" = yes ] && apply_overlay "$engine"
 
     if ( cd "$CB/$engine" && BENCH_TRIES="$tries" ./benchmark.sh ) 2>&1 | tee "$log"; then
@@ -87,6 +110,7 @@ run_phase() {
     fi
 
     [ "$overlay" = yes ] && reset_overlay "$engine"
+    [ "$rootless" = yes ] && reset_rootless "$engine"
     [ "$rc" -eq 0 ] && rm -f "$log"
     return "$rc"
 }

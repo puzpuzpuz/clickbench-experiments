@@ -1,0 +1,16 @@
+#!/bin/bash
+# ROOTLESS: build + ingest the native table with no sudo. Because the server's
+# user_files_path is this dir (set in ./start), the parquet files are read in
+# place — ClickBench's vanilla load instead symlinks them into
+# /var/lib/clickhouse/user_files (sudo) and chowns them. DROP IF EXISTS makes
+# the load idempotent across passes (the table persists in ch-data). The INSERT
+# mirrors ClickBench's clickhouse/load.
+set -e
+
+# shellcheck source=/dev/null
+mit=$(( $(nproc) / 4 )); [ "$mit" -lt 1 ] && mit=1
+
+./clickhouse client --query "DROP TABLE IF EXISTS hits"
+./clickhouse client < create.sql
+./clickhouse client --query "INSERT INTO hits SELECT * FROM file('hits_*.parquet')" --max-insert-threads "$mit"
+sync

@@ -1,0 +1,5 @@
+#!/bin/bash
+# ROOTLESS: same query as vanilla data-size, via ./clickhouse client.
+set -e
+
+./clickhouse client --query "SELECT total_bytes FROM system.tables WHERE name = 'hits' AND database = 'default'"

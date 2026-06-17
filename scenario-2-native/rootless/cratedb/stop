@@ -1,0 +1,15 @@
+#!/bin/bash
+# ROOTLESS: stop the user-mode CrateDB (no systemctl). Wait for the JVM to fully
+# exit so the path.data lock is released and the cluster state is flushed before
+# the next per-query ./start — otherwise the restart can re-bootstrap a fresh
+# cluster and lose the table. Leaves crate-data so the table is reopened.
+if [ -f crate.pid ]; then
+    pid="$(cat crate.pid)"
+    kill "$pid" 2>/dev/null
+    for _ in $(seq 1 60); do
+        kill -0 "$pid" 2>/dev/null || break
+        sleep 1
+    done
+fi
+rm -f crate.pid
+exit 0

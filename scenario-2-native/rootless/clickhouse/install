@@ -1,0 +1,9 @@
+#!/bin/bash
+# ROOTLESS: download the clickhouse binary only — NO `sudo clickhouse install`,
+# no system service, no /var/lib/clickhouse. The server runs as your user with
+# local paths (see ./start). Same binary, same queries as vanilla.
+set -e
+
+if [ ! -x ./clickhouse ]; then
+    curl https://clickhouse.com/ | sh
+fi

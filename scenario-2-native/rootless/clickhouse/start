@@ -1,0 +1,46 @@
+#!/bin/bash
+# ROOTLESS: run clickhouse-server as the current user with local data/log/tmp
+# dirs and a minimal config (no sudo). Idempotent; preserves ch-data across the
+# vanilla per-query restarts. The config carries the same eager-load tweaks as
+# ClickBench's clickhouse/install (async_load_databases off, MergeTree lazy
+# loads off) and sets user_files_path to this dir so the parquet files are read
+# in place — no privileged symlink into /var/lib/clickhouse/user_files.
+set -e
+
+D="$PWD"
+
+# Already up? (the driver restarts per query; be safe.)
+if ./clickhouse client --query "SELECT 1" >/dev/null 2>&1; then
+    exit 0
+fi
+
+mkdir -p "$D/ch-data" "$D/ch-tmp" "$D/ch-logs"
+
+cat > "$D/ch-config.yaml" <<EOF
+logger: {level: warning, log: $D/ch-logs/server.log, errorlog: $D/ch-logs/server.err.log, console: 0}
+tcp_port: 9000
+listen_host: 127.0.0.1
+path: $D/ch-data/
+tmp_path: $D/ch-tmp/
+user_files_path: $D/
+user_directories:
+  users_xml: {path: $D/ch-users.yaml}
+async_load_databases: false
+merge_tree: {primary_key_lazy_load: 0, columns_and_secondary_indices_sizes_lazy_calculation: 0}
+EOF
+
+cat > "$D/ch-users.yaml" <<EOF
+profiles: {default: {}}
+users:
+  default: {password: '', networks: {ip: '::/0'}, profile: default, quota: default}
+quotas: {default: {}}
+EOF
+
+./clickhouse server -C "$D/ch-config.yaml" --pid-file="$D/ch.pid" --daemon
+
+for _ in $(seq 1 60); do
+    ./clickhouse client --query "SELECT 1" >/dev/null 2>&1 && exit 0
+    sleep 1
+done
+echo "clickhouse (rootless): server did not come up; see $D/ch-logs/" >&2
+exit 1

@@ -1,0 +1,6 @@
+#!/bin/bash
+# ROOTLESS: identical to vanilla query, but via ./clickhouse client (no system
+# symlink). Stderr last line is clickhouse's own --time value.
+set -e
+
+./clickhouse client --time --format=Pretty

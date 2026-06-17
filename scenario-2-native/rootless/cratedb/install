@@ -1,0 +1,21 @@
+#!/bin/bash
+# ROOTLESS: install CrateDB from its tarball (bundled JDK), not via apt +
+# systemctl. No daemon sudo. The psql client used by load/query/check is the
+# only apt dependency — installed once here if missing (pre-install
+# postgresql-client to avoid even that prompt).
+set -eu
+
+CRATE_VERSION="${CRATE_VERSION:-5.10.10}"
+
+if ! command -v psql >/dev/null 2>&1; then
+    sudo apt-get update -y
+    sudo apt-get install -y postgresql-client
+fi
+
+if [ ! -x crate/bin/crate ]; then
+    url="https://cdn.crate.io/downloads/releases/cratedb/x64_linux/crate-${CRATE_VERSION}.tar.gz"
+    wget --continue --progress=dot:giga "$url" -O crate.tar.gz
+    mkdir -p crate
+    tar xf crate.tar.gz --one-top-level=crate --strip-components 1
+    rm -f crate.tar.gz
+fi

@@ -1,0 +1,32 @@
+#!/bin/bash
+# ROOTLESS: run CrateDB as the current user from the tarball (no systemctl).
+# Single-node, bound to localhost, data under ./crate-data. Idempotent;
+# readiness (incl. shard recovery) is gated by the vanilla ./check.
+set -eu
+
+if psql -U crate -h localhost --no-password -t -c 'SELECT 1' >/dev/null 2>&1; then
+    exit 0
+fi
+
+D="$PWD"
+CRATE_HOME="$D/crate"
+mkdir -p "$D/crate-logs"
+
+# Background it ourselves (more reliable than crate's own -d daemon mode) and
+# record the JVM pid for ./stop. CRATE_HEAP_SIZE can be set to tune the heap.
+CRATE_HOME="$CRATE_HOME" "$CRATE_HOME/bin/crate" \
+    -Cpath.data="$D/crate-data" \
+    -Cdiscovery.type=single-node \
+    -Cnetwork.host=127.0.0.1 \
+    -Cgateway.expected_data_nodes=1 \
+    -Cpsql.port=5432 \
+    -Chttp.port=4200 \
+    > "$D/crate-logs/crate.log" 2>&1 &
+echo $! > "$D/crate.pid"
+
+for _ in $(seq 1 90); do
+    psql -U crate -h localhost --no-password -t -c 'SELECT 1' >/dev/null 2>&1 && exit 0
+    sleep 1
+done
+echo "cratedb (rootless): did not come up; see $D/crate-logs/crate.log" >&2
+exit 1

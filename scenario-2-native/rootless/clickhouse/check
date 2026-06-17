@@ -1,0 +1,6 @@
+#!/bin/bash
+# ROOTLESS: healthy iff the user-mode server answers (uses ./clickhouse client
+# rather than the system-installed clickhouse-client symlink).
+set -e
+
+./clickhouse client --query "SELECT 1" >/dev/null
