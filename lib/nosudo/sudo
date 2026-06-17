@@ -1,0 +1,26 @@
+#!/bin/bash
+# A `sudo` shim placed first on PATH by the run drivers.
+#
+# We report HOT runs only. ClickBench's cold-run machinery flushes the OS page
+# cache before each query's FIRST run via:
+#     echo 3 | sudo tee /proc/sys/vm/drop_caches
+# That flush only affects the (discarded) cold run — hot runs are warm either
+# way — so we no-op it here. This removes the single per-query sudo call and so
+# the passwordless-sudo requirement, with ZERO effect on hot-run scores.
+#
+# Everything else (e.g. `sudo clickhouse start`) is forwarded unchanged to the
+# real sudo, so any genuine privileged step still works exactly as before.
+#
+# Tied to the pinned ClickBench commit's exact drop_caches invocation; opt out
+# entirely with BENCH_REAL_DROP_CACHES=1 (the drivers then don't add this shim).
+
+if [ "${1:-}" = "tee" ] && [ "${2:-}" = "/proc/sys/vm/drop_caches" ]; then
+    cat >/dev/null 2>&1   # swallow the piped "3", do nothing, succeed
+    exit 0
+fi
+
+for real in /usr/bin/sudo /bin/sudo /usr/local/bin/sudo; do
+    if [ -x "$real" ]; then exec "$real" "$@"; fi
+done
+echo "nosudo shim: real sudo not found on standard paths" >&2
+exit 1

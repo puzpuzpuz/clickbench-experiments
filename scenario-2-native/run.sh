@@ -37,6 +37,13 @@ ENGINES=("$@"); [ "$#" -eq 0 ] && ENGINES=("${ALL_ENGINES[@]}")
 [ -d "$CB/.git" ] || { echo "ClickBench checkout not found at $CB; run ./setup.sh first." >&2; exit 1; }
 export BENCH_CONCURRENT_DURATION=0   # skip the 600s QPS probe
 
+# Hot-run only: shim out the per-query cold-cache drop so it needs no sudo.
+# Zero effect on hot scores. Set BENCH_REAL_DROP_CACHES=1 to keep real cold runs.
+# (Note: native ClickHouse + CrateDB still sudo for their daemons — see README.)
+if [ -z "${BENCH_REAL_DROP_CACHES:-}" ]; then
+    export PATH="$here/../lib/nosudo:$PATH"
+fi
+
 has_overlay() { [ -d "$here/modified/$1" ]; }
 
 apply_overlay() {

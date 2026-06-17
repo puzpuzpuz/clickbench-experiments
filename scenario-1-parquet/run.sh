@@ -38,6 +38,13 @@ ENGINES=("$@"); [ "$#" -eq 0 ] && ENGINES=("${ALL_ENGINES[@]}")
 # hot-run thesis and just burns ~10 min per run.
 export BENCH_CONCURRENT_DURATION=0
 
+# Hot-run only: shim out the per-query cold-cache drop so no sudo (and thus no
+# passwordless sudo) is needed for it. Zero effect on hot scores. Set
+# BENCH_REAL_DROP_CACHES=1 to keep real cold runs (needs passwordless sudo).
+if [ -z "${BENCH_REAL_DROP_CACHES:-}" ]; then
+    export PATH="$here/../lib/nosudo:$PATH"
+fi
+
 apply_overlay() {
     local engine="$1"
     cp "$here/../lib/fifo-repl.sh" "$here/../lib/repl-engine.py" "$CB/lib/"

@@ -78,14 +78,21 @@ This is validated end-to-end against the real engines on a tiny parquet; see
 ## Requirements
 
 - Ubuntu 24.04+ (matches ClickBench's assumptions), `git`, `python3`, `jq`,
-  `curl`, `unzip`, `bash`.
-- **Passwordless sudo** for the cold-cycle cache drop and ClickHouse:
-  ClickBench runs `echo 3 | sudo tee /proc/sys/vm/drop_caches` before each
-  query's first run, and ClickHouse's scripts call `sudo clickhouse ...`.
-  Configure e.g. `/etc/sudoers.d/clickbench`:
-  ```
-  <you> ALL=(root) NOPASSWD: /usr/bin/tee /proc/sys/vm/drop_caches, /usr/bin/clickhouse, /usr/sbin/clickhouse
-  ```
+  `curl`, `unzip`, `bash`. Pre-installing `python3-venv gcc git` avoids the
+  one-time `apt` prompts in some vanilla installers.
+- **No passwordless sudo needed** for scenario 1, or for scenario-2 DuckDB and
+  QuestDB. ClickBench's only per-query sudo is the cold-cache drop
+  (`sudo tee /proc/sys/vm/drop_caches`); since we report hot runs only, the run
+  drivers shim it out (`lib/nosudo/`) with zero effect on hot scores. Set
+  `BENCH_REAL_DROP_CACHES=1` to restore real cold runs (that needs passwordless
+  sudo for `tee /proc/sys/vm/drop_caches`).
+- A few **one-time** `sudo` prompts may still appear at first install (DataFusion's
+  Rust/`gcc` build deps, Polars/Hyper's `python3-venv`, DuckDB's `/usr/local/bin`
+  symlink). Pre-install the deps above to skip most.
+- **Scenario-2 native ClickHouse and CrateDB still use `sudo`** to manage their
+  daemons (system install + a per-query restart under the vanilla cold-run rules).
+  Those two are the only remaining sudo users; run them under a warmed `sudo -v`
+  session, or ask for the rootless (user-mode) overrides.
 - Disk: the parquet dataset is ~15 GB; QuestDB's CSV load needs ~70 GB
   uncompressed transiently. Budget ~120 GB free.
 - Engines install on first run: vanilla via ClickBench's own per-engine
@@ -146,6 +153,7 @@ lib/fifo-repl.sh              long-lived REPL-over-FIFO keep-alive harness
 lib/repl-engine.py            resident embedded-engine server (chdb/datafusion/hyper)
 lib/log-to-json.py            benchmark.sh log -> dashboard result JSON (+ --collapse-hot)
 lib/score.py                  ClickBench hot-run geomean score for a group of results
+lib/nosudo/sudo               PATH shim: no-ops the cold-cache drop (removes per-query sudo)
 lib/selftest.sh, lib/mock-repl   harness validation (no engine needed)
 scenario-1-parquet/
   run.sh                      vanilla + keep-alive driver
