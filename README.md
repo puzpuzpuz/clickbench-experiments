@@ -98,9 +98,10 @@ This is validated end-to-end against the real engines on a tiny parquet; see
   per-query, so passwordless sudo is never required.
 - Disk: the parquet dataset is ~15 GB; QuestDB's CSV load needs ~70 GB
   uncompressed transiently. Budget ~120 GB free.
-- Engines install on first run: vanilla via ClickBench's own per-engine
-  `install`; the modified library engines create a local `myenv/` venv and
-  `pip install chdb` / `datafusion` / `tableauhyperapi`.
+- Engines install themselves on first run: vanilla engines via ClickBench's own
+  per-engine `install`; the modified library engines create a local `myenv/` venv
+  (`pip install chdb` / `datafusion` / `tableauhyperapi`); scenario-2 ClickHouse
+  and CrateDB use the rootless installs (binary / tarball, no system package).
 
 ## Quickstart
 
@@ -118,6 +119,8 @@ MACHINE=ryzen9-7900 scenario-2-native/run.sh
 # See the hot-run scores re-rank (lower is better):
 lib/score.py scenario-1-parquet/results/original/*.json
 lib/score.py scenario-1-parquet/results/modified/*.json
+lib/score.py scenario-2-native/results/original/*.json
+lib/score.py scenario-2-native/results/warmup/*.json
 ```
 
 Results are written to `scenario-*/results/{original,modified,warmup}/<engine>.<machine>.json`
@@ -139,12 +142,14 @@ concurrent-QPS probe (`BENCH_CONCURRENT_DURATION=0`).
 ./teardown.sh --nuke       # also remove the ./clickbench checkout
 ```
 
-Stops every daemon/resident session, uninstalls the system-level databases
-(ClickHouse, QuestDB, DuckDB, CrateDB — uses `sudo`), and `git clean -xfd`s the
-checkout to wipe all datasets, `hits.db`, venvs, engine binaries, and FIFO
-plumbing. Your `results/` are left untouched. The Rust toolchain
-(`~/.cargo`, `~/.rustup`, from a vanilla-DataFusion run) is left for you to
-remove by hand if you want.
+Stops every daemon/resident session and `git clean -xfd`s the checkout to wipe
+all datasets, `hits.db`, the rootless `ch-data`/`crate-data` + engine binaries,
+venvs, and FIFO plumbing; it also removes `~/.questdb` and `~/.duckdb`. With the
+default rootless ClickHouse/CrateDB this needs **no sudo** — system-level
+removals (`/var/lib/clickhouse`, the `crate` apt package, the `/usr/local/bin`
+duckdb symlink, …) run only if a *vanilla* system install is actually detected.
+`--dry-run` prints the exact plan (including a `git clean -xnd` preview). Your
+`results/` and the Rust toolchain (`~/.cargo`, `~/.rustup`) are left untouched.
 
 ## Layout
 
