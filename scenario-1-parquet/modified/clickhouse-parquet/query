@@ -1,0 +1,13 @@
+#!/bin/bash
+# MODIFIED (keep-alive): dispatch the query into the resident clickhouse-local
+# session. Stdout: result. Stderr last line: clickhouse's own `--time` value —
+# the same number the vanilla path reports. Only process persistence differs.
+set -e
+
+# shellcheck source=../../../lib/fifo-repl.sh
+source ../lib/fifo-repl.sh
+# shellcheck source=./repl.env
+source ./repl.env
+
+query="$(cat)"
+repl_query "$query"

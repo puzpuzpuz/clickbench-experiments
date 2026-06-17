@@ -1,0 +1,19 @@
+#!/bin/bash
+# MODIFIED (keep-alive): create the VIEW over hits.parquet *inside* the already
+# running resident session. A separate `duckdb hits.db -f create.sql` process
+# (as the vanilla load does) can't run here — it would collide with the
+# resident session holding hits.db open.
+set -e
+
+# shellcheck source=../../../lib/fifo-repl.sh
+source ../lib/fifo-repl.sh
+# shellcheck source=./repl.env
+source ./repl.env
+
+# create.sql is the pristine upstream file (CREATE VIEW + a macro). The view is
+# lazy, so no parquet data is read here — only the plan is registered.
+if ! repl_query "$(cat create.sql)" >/dev/null 2>&1; then
+    echo "load: failed to register hits view in resident session" >&2
+    exit 1
+fi
+sync

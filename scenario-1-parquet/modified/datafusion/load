@@ -1,0 +1,15 @@
+#!/bin/bash
+# MODIFIED (keep-alive): register the external table + view ONCE in the
+# resident session via `.load` (repl-engine.py runs the pristine create.sql).
+set -e
+
+# shellcheck source=../../../lib/fifo-repl.sh
+source ../lib/fifo-repl.sh
+# shellcheck source=./repl.env
+source ./repl.env
+
+if ! repl_query ".load" >/dev/null 2>&1; then
+    echo "load: .load (create.sql) failed in resident DataFusion session" >&2
+    exit 1
+fi
+sync

@@ -1,0 +1,18 @@
+#!/bin/bash
+# MODIFIED (keep-alive): launch ONE resident duckdb session bound to hits.db
+# and keep it reading queries from a FIFO for the whole run, instead of
+# spawning a fresh `duckdb` process per query. Vanilla upstream `start` is a
+# no-op WAL-clean; here we also start the session.
+set -e
+
+# shellcheck source=../../../lib/fifo-repl.sh
+source ../lib/fifo-repl.sh
+# shellcheck source=./repl.env
+source ./repl.env
+
+# Fresh DB each run; the resident session (re)creates the VIEW at ./load time.
+# Mirrors the vanilla load's `rm -f hits.db`.
+shopt -s nullglob
+rm -f ./hits.db ./hits.db.wal ./*.wal
+
+repl_start

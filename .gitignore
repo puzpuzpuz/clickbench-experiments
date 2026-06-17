@@ -1,0 +1,21 @@
+# The pinned ClickBench checkout is fetched by setup.sh, never vendored here
+# (ClickBench is CC BY-NC-SA 4.0 — see NOTICE).
+/clickbench/
+
+# Datasets and engine working files
+*.parquet
+*.tsv
+*.tsv.gz
+*.csv
+*.csv.gz
+*.json.gz
+*.db
+*.db.wal
+*.wal
+
+# Long-lived REPL plumbing + logs
+.cb_*
+*.log
+
+__pycache__/
+myenv/

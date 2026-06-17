@@ -1,0 +1,11 @@
+#!/bin/bash
+# MODIFIED (keep-alive): install the datafusion Python library into a venv,
+# instead of building datafusion-cli from Rust source. Same engine, kept
+# resident in one SessionContext.
+set -e
+
+if [ ! -d myenv ]; then
+    python3 -m venv myenv
+fi
+myenv/bin/pip install --quiet --upgrade pip
+myenv/bin/pip install --quiet datafusion

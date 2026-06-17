@@ -1,0 +1,13 @@
+#!/bin/bash
+# MODIFIED (keep-alive): dispatch the query into the resident DataFusion
+# session. Stderr last line: perf_counter around .collect() (the engine's
+# execute time, mirroring datafusion-cli's `Elapsed`).
+set -e
+
+# shellcheck source=../../../lib/fifo-repl.sh
+source ../lib/fifo-repl.sh
+# shellcheck source=./repl.env
+source ./repl.env
+
+query="$(cat)"
+repl_query "$query"

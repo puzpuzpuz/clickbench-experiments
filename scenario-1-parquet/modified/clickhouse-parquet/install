@@ -1,0 +1,11 @@
+#!/bin/bash
+# MODIFIED (keep-alive): install chdb (clickhouse-local as a library) into a
+# venv. Vanilla installs the clickhouse CLI binary; we keep the same engine
+# resident via its library instead.
+set -e
+
+if [ ! -d myenv ]; then
+    python3 -m venv myenv
+fi
+myenv/bin/pip install --quiet --upgrade pip
+myenv/bin/pip install --quiet chdb

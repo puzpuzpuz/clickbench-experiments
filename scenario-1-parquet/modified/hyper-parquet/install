@@ -1,0 +1,16 @@
+#!/bin/bash
+# MODIFIED (keep-alive): install tableauhyperapi into a venv (same as vanilla
+# hyper-parquet). The difference is purely in how query/start/stop drive it.
+set -e
+
+# tableauhyperapi has no Linux arm64 wheel (mirrors vanilla hyper/install).
+if [ "$(uname -m)" != "x86_64" ] && [ "$(uname -m)" != "amd64" ]; then
+    echo "hyper-parquet: tableauhyperapi has no Linux $(uname -m) wheel; skipping" >&2
+    exit 1
+fi
+
+if [ ! -d myenv ]; then
+    python3 -m venv myenv
+fi
+myenv/bin/pip install --quiet --upgrade pip
+myenv/bin/pip install --quiet tableauhyperapi

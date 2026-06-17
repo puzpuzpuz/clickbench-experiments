@@ -1,0 +1,13 @@
+#!/bin/bash
+# MODIFIED (keep-alive): dispatch the query into the resident Hyper session.
+# Stderr last line: perf_counter around execute_list_query (the exact timing
+# method the vanilla hyper-parquet script uses).
+set -e
+
+# shellcheck source=../../../lib/fifo-repl.sh
+source ../lib/fifo-repl.sh
+# shellcheck source=./repl.env
+source ./repl.env
+
+query="$(cat)"
+repl_query "$query"

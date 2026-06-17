@@ -1,0 +1,24 @@
+#!/usr/bin/env python3
+# A tiny stand-in for an interactive SQL CLI (duckdb-like), used by
+# selftest.sh to validate the FIFO transport without installing any engine.
+# Reads statements from stdin, and for each "query" emits a fake result row
+# followed by a duckdb-style `Run Time (s): real <secs>` line. Handles the
+# `.timer`, `.print`, and `.quit` dot-commands the harness relies on.
+import sys
+
+FAKE_SECS = "0.042"
+
+for line in sys.stdin:
+    line = line.rstrip("\n")
+    if line.startswith(".timer"):
+        continue
+    if line.startswith(".print "):
+        print(line[len(".print "):], flush=True)
+        continue
+    if line.startswith(".quit") or line.startswith(".exit"):
+        break
+    if not line.strip():
+        continue
+    # Pretend to execute a statement.
+    print(f"fake_result_for: {line}", flush=True)
+    print(f"Run Time (s): real {FAKE_SECS} user 0.030 sys 0.010", flush=True)

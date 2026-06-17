@@ -1,0 +1,34 @@
+clickbench-experiments
+=======================
+
+This repository contains original tooling (a long-lived "REPL-over-FIFO"
+keep-alive harness, per-engine overlay scripts, run drivers, and selftests)
+authored to accompany the QuestDB blog post "Lies, Damn Lies and Database
+Benchmarks". This original code is licensed under the Apache License 2.0 (see
+LICENSE).
+
+It does NOT vendor or redistribute ClickBench.
+---------------------------------------------
+
+ClickBench (https://github.com/ClickHouse/ClickBench) by Alexey Milovidov and
+the ClickHouse team is licensed under the Creative Commons
+Attribution-NonCommercial-ShareAlike 4.0 International license
+(CC BY-NC-SA 4.0): https://creativecommons.org/licenses/by-nc-sa/4.0/
+
+To respect that license we do not copy ClickBench's scripts, queries, schemas,
+or dataset into this repository. Instead, `setup.sh` clones ClickBench from its
+canonical source at a pinned commit (see CLICKBENCH_COMMIT), and our overlays
+reference the files in that checkout in place.
+
+The benchmark methodology, the 43-query workload, the table schemas, and the
+"hits" dataset are the work of the ClickHouse team and remain under
+CC BY-NC-SA 4.0. We measure our own numbers with this harness and report them
+with attribution, as explicitly anticipated by ClickBench's "Results Usage"
+rules. Always reference the original benchmark:
+https://github.com/ClickHouse/ClickBench/ and https://benchmark.clickhouse.com/
+
+One small exception to "no vendoring": scenario-2-native/modified/duckdb/load
+contains the SQL to ingest hits.parquet into the native DuckDB table inside the
+resident session. Its int-day/second -> DATE/TIMESTAMP column conversions are
+dictated by the dataset and necessarily match those in ClickBench's duckdb/load;
+they are reproduced here only as functional glue, with attribution.

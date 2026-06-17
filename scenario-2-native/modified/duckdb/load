@@ -1,0 +1,31 @@
+#!/bin/bash
+# MODIFIED (keep-alive): build + ingest the native table INSIDE the resident
+# session (a separate `duckdb hits.db` process, as the vanilla load uses, would
+# collide with the resident session holding hits.db open).
+#
+# Schema comes from the pristine upstream create.sql; the INSERT applies the
+# same int-day/second -> DATE/TIMESTAMP conversions the vanilla duckdb load
+# performs (these are dictated by the dataset, not a creative choice). CHECKPOINT
+# flushes the WAL into hits.db so ./data-size (wc -c hits.db) sees the full DB.
+set -e
+
+# shellcheck source=../../../lib/fifo-repl.sh
+source ../lib/fifo-repl.sh
+# shellcheck source=./repl.env
+source ./repl.env
+
+if ! REPL_TIMEOUT=3600 repl_query "$(cat create.sql)
+INSERT INTO hits
+SELECT * REPLACE (
+    make_date(EventDate) AS EventDate,
+    epoch_ms(EventTime * 1000) AS EventTime,
+    epoch_ms(ClientEventTime * 1000) AS ClientEventTime,
+    epoch_ms(LocalEventTime * 1000) AS LocalEventTime)
+FROM read_parquet('hits.parquet', binary_as_string=True);
+CHECKPOINT;" >/dev/null 2>&1; then
+    echo "load: native ingest failed in resident session" >&2
+    exit 1
+fi
+
+rm -f hits.parquet
+sync

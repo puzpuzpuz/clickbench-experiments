@@ -1,0 +1,11 @@
+#!/bin/bash
+# MODIFIED (keep-alive): healthy iff the resident session is up and a probe
+# query round-trips. (Vanilla `check` runs `duckdb -c "SELECT 1"`.)
+set -e
+
+# shellcheck source=../../../lib/fifo-repl.sh
+source ../lib/fifo-repl.sh
+# shellcheck source=./repl.env
+source ./repl.env
+
+repl_is_up && repl_probe

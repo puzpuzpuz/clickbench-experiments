@@ -1,0 +1,11 @@
+#!/bin/bash
+# MODIFIED (keep-alive): launch the resident Hyper session (one HyperProcess +
+# Connection for the whole run), reading queries from a FIFO.
+set -e
+
+# shellcheck source=../../../lib/fifo-repl.sh
+source ../lib/fifo-repl.sh
+# shellcheck source=./repl.env
+source ./repl.env
+
+repl_start

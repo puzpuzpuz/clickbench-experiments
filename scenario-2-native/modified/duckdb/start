@@ -1,0 +1,15 @@
+#!/bin/bash
+# MODIFIED (keep-alive): launch ONE resident duckdb session bound to the native
+# hits.db for the whole run, instead of a fresh `duckdb hits.db` per query.
+set -e
+
+# shellcheck source=../../../lib/fifo-repl.sh
+source ../lib/fifo-repl.sh
+# shellcheck source=./repl.env
+source ./repl.env
+
+# Fresh DB each run; the resident session builds + ingests the table at ./load.
+shopt -s nullglob
+rm -f ./hits.db ./hits.db.wal ./*.wal
+
+repl_start

@@ -1,0 +1,12 @@
+#!/bin/bash
+# MODIFIED (keep-alive): launch ONE resident clickhouse-local session reading
+# queries from a FIFO for the whole run, instead of spawning a fresh
+# `clickhouse local` per query. (Vanilla `start` is a no-op.)
+set -e
+
+# shellcheck source=../../../lib/fifo-repl.sh
+source ../lib/fifo-repl.sh
+# shellcheck source=./repl.env
+source ./repl.env
+
+repl_start

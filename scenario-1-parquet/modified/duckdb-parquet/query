@@ -1,0 +1,14 @@
+#!/bin/bash
+# MODIFIED (keep-alive): dispatch the query into the resident duckdb session
+# (vanilla spawns a fresh `duckdb hits.db -c ...` here). Stdout: result.
+# Stderr last line: duckdb's own `Run Time` in fractional seconds — the exact
+# same number the vanilla script reports. Only process persistence differs.
+set -e
+
+# shellcheck source=../../../lib/fifo-repl.sh
+source ../lib/fifo-repl.sh
+# shellcheck source=./repl.env
+source ./repl.env
+
+query="$(cat)"
+repl_query "$query"
