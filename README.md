@@ -121,10 +121,26 @@ and run its `generate-results.sh`.
 `PASSES`/`PHASES`, `WARMUP_TRIES` (default 10). Both drivers skip the 600 s
 concurrent-QPS probe (`BENCH_CONCURRENT_DURATION=0`).
 
+### Teardown / reset
+
+```bash
+./teardown.sh --dry-run    # show exactly what would be removed
+./teardown.sh              # stop + uninstall all DBs, wipe datasets & db dirs
+./teardown.sh --nuke       # also remove the ./clickbench checkout
+```
+
+Stops every daemon/resident session, uninstalls the system-level databases
+(ClickHouse, QuestDB, DuckDB, CrateDB — uses `sudo`), and `git clean -xfd`s the
+checkout to wipe all datasets, `hits.db`, venvs, engine binaries, and FIFO
+plumbing. Your `results/` are left untouched. The Rust toolchain
+(`~/.cargo`, `~/.rustup`, from a vanilla-DataFusion run) is left for you to
+remove by hand if you want.
+
 ## Layout
 
 ```
 setup.sh                      fetch ClickBench @ pin (never vendored)
+teardown.sh                   stop + uninstall all DBs, wipe datasets/db dirs (try --dry-run)
 CLICKBENCH_COMMIT             the pin
 lib/fifo-repl.sh              long-lived REPL-over-FIFO keep-alive harness
 lib/repl-engine.py            resident embedded-engine server (chdb/datafusion/hyper)
