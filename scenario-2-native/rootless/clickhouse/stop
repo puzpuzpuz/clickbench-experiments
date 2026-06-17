@@ -1,10 +1,22 @@
 #!/bin/bash
 # ROOTLESS: stop the user-mode clickhouse-server (no sudo). Leaves ch-data in
 # place so the next ./start (per-query restart) reopens the loaded table.
-[ -f ch.pid ] && kill "$(cat ch.pid)" 2>/dev/null
-for _ in $(seq 1 20); do
-    ./clickhouse client --query "SELECT 1" >/dev/null 2>&1 || break
-    sleep 0.5
-done
+#
+# Wait for the server PROCESS to fully exit — not merely to stop answering
+# SELECT 1. A flushing ~15 GB MergeTree keeps its data files open for a moment
+# after it stops accepting connections; if we return early, the driver's cold
+# cycle (or the run driver's reset_rootless `rm -rf ch-data`) can wipe/recreate
+# the data dir underneath the still-live process, corrupting the Atomic
+# database's metadata (symptom: "rename: No such file" on the next DROP TABLE).
+# Mirrors the rootless cratedb stop, which waits on the JVM pid for the same
+# lock-release reason.
+if [ -f ch.pid ]; then
+    pid="$(cat ch.pid)"
+    kill "$pid" 2>/dev/null
+    for _ in $(seq 1 120); do
+        kill -0 "$pid" 2>/dev/null || break
+        sleep 0.5
+    done
+fi
 rm -f ch.pid
 exit 0
