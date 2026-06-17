@@ -1,0 +1,30 @@
+#!/bin/bash
+# OVERRIDE: mirrors ClickBench's questdb/start, but applies BOTH the old and
+# new query-timeout config keys. The key was renamed query.timeout.sec=60 ->
+# query.timeout=1m around QuestDB 9.3.5 (ClickBench PR #902); applying both
+# forms keeps the timeout bump working regardless of the installed version.
+set -eu
+
+# Idempotent: if HTTP API on :9000 already responds, do nothing.
+if curl -sSf -G --data-urlencode 'query=SELECT 1' 'http://localhost:9000/exec' >/dev/null 2>&1; then
+    exit 0
+fi
+
+questdb/bin/questdb.sh start
+
+# Wait for HTTP port.
+for _ in $(seq 1 60); do
+    if nc -z localhost 9000 2>/dev/null; then break; fi
+    sleep 1
+done
+
+# Tweak config (idempotent — sed -i with the same value is safe). Handle both
+# the old (query.timeout.sec=60) and new (query.timeout=1m) key/value forms.
+mkdir -p ~/.questdb/conf
+if [ -f ~/.questdb/conf/server.conf ]; then
+    sed -i 's/query.timeout.sec=60/query.timeout.sec=500/; s/query.timeout=1m/query.timeout=10m/' ~/.questdb/conf/server.conf
+    sed -i "s|cairo.sql.copy.root=import|cairo.sql.copy.root=$PWD|" ~/.questdb/conf/server.conf
+    questdb/bin/questdb.sh stop
+    sleep 2
+    questdb/bin/questdb.sh start
+fi

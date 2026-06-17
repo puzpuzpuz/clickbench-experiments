@@ -96,6 +96,12 @@ This is validated end-to-end against the real engines on a tiny parquet; see
   as your user (local data dir + config, parquet read in place) and CrateDB from
   its tarball (`bin/crate`, not apt/systemctl). The vanilla per-query restart is
   preserved. Both are validated end-to-end including cross-restart persistence.
+  `scenario-2-native/rootless/questdb/` is also applied the same way, but as a
+  *version/config* override rather than a de-sudo one (QuestDB already runs
+  rootless): it bumps QuestDB to the latest 9.4.3 — the pinned 9.3.1 lacks
+  `length_bytes()` so Q27/Q28 DNF, and predates the `query.timeout.sec` →
+  `query.timeout` config rename (ClickBench PR #902) — and makes the load
+  idempotent (`DROP TABLE IF EXISTS`) so the warmup pass can reload cleanly.
 - With `python3-venv gcc git postgresql-client` pre-installed and a `duckdb`
   binary already on your `PATH`, there are **zero** sudo prompts: the shim skips
   the install-time `apt-get`, and the vanilla DuckDB install's `sudo ln` symlink
@@ -179,5 +185,6 @@ scenario-2-native/
   run.sh                      original / keep-alive / warmup driver
   modified/duckdb/            keep-alive overlay (only fresh-process engine here)
   rootless/{clickhouse,cratedb}/   user-mode (no-sudo) daemon overrides
+  rootless/questdb/                version (9.4.3) + timeout/load override (PR #902)
   results/{original,modified,warmup}/
 ```

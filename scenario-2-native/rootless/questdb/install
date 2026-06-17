@@ -1,0 +1,34 @@
+#!/bin/bash
+# OVERRIDE (applied as the current user via run.sh, like the rootless
+# clickhouse/cratedb overlays — questdb is already no-sudo): bump QuestDB off
+# the pinned 9.3.1, which has a known ClickBench issue (see PR #902):
+#   * 9.3.1 lacks length_bytes() (added in 9.3.2) -> Q27/Q28 "Did Not Finish".
+#   * the query-timeout config key was renamed query.timeout.sec -> query.timeout
+#     around 9.3.5, so the vanilla start's timeout bump silently no-ops on it.
+# PR #902 went to 9.3.5; we use the latest 9.4.3 (override with QDB_VERSION).
+# This file mirrors ClickBench's questdb/install except the version default.
+set -eu
+
+qdb_version="${QDB_VERSION:-9.4.3}"
+
+if [ -d questdb/bin ]; then
+    exit 0
+fi
+
+if [[ $(arch) == "aarch64" ]] || [[ $(arch) == arm* ]]; then
+    # ARM uses no-JRE binary, so we install GraalVM JDK alongside.
+    wget --continue --progress=dot:giga \
+        https://github.com/graalvm/graalvm-ce-builds/releases/download/jdk-17.0.9/graalvm-community-jdk-17.0.9_linux-aarch64_bin.tar.gz
+    tar xf graalvm-community-*.tar.gz --one-top-level=graalvm --strip-components 1
+    export JAVA_HOME=$PWD/graalvm
+
+    wget --continue --progress=dot:giga \
+        "https://github.com/questdb/questdb/releases/download/${qdb_version}/questdb-${qdb_version}-no-jre-bin.tar.gz"
+    tar xf questdb*.tar.gz --one-top-level=questdb --strip-components 1
+    mkdir questdb/bin
+    mv questdb/* questdb/bin
+else
+    wget --continue --progress=dot:giga \
+        "https://github.com/questdb/questdb/releases/download/${qdb_version}/questdb-${qdb_version}-rt-linux-x86-64.tar.gz"
+    tar xf questdb*.tar.gz --one-top-level=questdb --strip-components 1
+fi
