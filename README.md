@@ -51,8 +51,10 @@ Native storage queried by **DuckDB**, **ClickHouse**, **QuestDB**, and
 **CrateDB**, in three passes:
 - `original` — vanilla, 3 tries.
 - `modified` — keep DuckDB (the only fresh-process engine) alive.
-- `warmup` — 30 tries for everyone so JIT engines (JVM-based QuestDB, CrateDB)
-  reach steady state, with the hot score taken as the best warm run.
+- `warmup` — 10 tries for everyone so JIT engines (JVM-based QuestDB, CrateDB)
+  reach steady state, with the hot score taken as the best warm run. (A
+  100M-row scan passes HotSpot's C2 threshold in a try or two, so 10 is plenty;
+  override with `WARMUP_TRIES`.)
 
 ## How the keep-alive is implemented
 
@@ -116,7 +118,7 @@ dashboard instead, drop these JSONs into a ClickBench checkout's `<system>/resul
 and run its `generate-results.sh`.
 
 `run.sh` overrides: `CLICKBENCH_DIR` (reuse an existing checkout), `MACHINE`,
-`PASSES`/`PHASES`, `WARMUP_TRIES` (default 30). Both drivers skip the 600 s
+`PASSES`/`PHASES`, `WARMUP_TRIES` (default 10). Both drivers skip the 600 s
 concurrent-QPS probe (`BENCH_CONCURRENT_DURATION=0`).
 
 ## Layout

@@ -7,9 +7,11 @@
 #   modified  M1: keep the only fresh-process engine (DuckDB) alive. The
 #             daemons (ClickHouse, QuestDB, CrateDB) are unchanged, so this
 #             pass only re-runs engines that actually have a keep-alive overlay.
-#   warmup    M2: 30 tries for ALL engines so JIT engines (JVM-based QuestDB,
+#   warmup    M2: 10 tries for ALL engines so JIT engines (JVM-based QuestDB,
 #             CrateDB) reach steady state; DuckDB stays kept-alive. The hot
 #             score is collapsed to the best warm run (--collapse-hot).
+#             (A 100M-row scan blows past HotSpot's C2 threshold in a try or
+#             two, so 10 is plenty; override with WARMUP_TRIES.)
 #
 # Results -> results/{original,modified,warmup}/<engine>.<machine>.json.
 #
@@ -27,7 +29,7 @@ CB="${CLICKBENCH_DIR:-$repo/clickbench}"
 MACHINE="${MACHINE:-ryzen9-7900}"
 DATE="$(date -u +%Y-%m-%d)"
 PASSES="${PASSES:-original modified warmup}"
-WARMUP_TRIES="${WARMUP_TRIES:-30}"
+WARMUP_TRIES="${WARMUP_TRIES:-10}"
 
 ALL_ENGINES=(duckdb clickhouse questdb cratedb)
 ENGINES=("$@"); [ "$#" -eq 0 ] && ENGINES=("${ALL_ENGINES[@]}")
