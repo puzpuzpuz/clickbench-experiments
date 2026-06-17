@@ -81,9 +81,14 @@ This is validated end-to-end against the real engines on a tiny parquet; see
   `curl`, `unzip`, `bash`. Pre-installing `python3-venv gcc git` avoids the
   one-time `apt` prompts in some vanilla installers.
 - **No passwordless sudo needed** for scenario 1, or for scenario-2 DuckDB and
-  QuestDB. ClickBench's only per-query sudo is the cold-cache drop
-  (`sudo tee /proc/sys/vm/drop_caches`); since we report hot runs only, the run
-  drivers shim it out (`lib/nosudo/`) with zero effect on hot scores. Set
+  QuestDB. The `lib/nosudo/` shim (prepended to PATH by the run drivers)
+  neutralizes the handful of `sudo` calls in the upstream scripts, each a
+  provable no-op for hot-run-only measurement: the per-query cold-cache drop
+  (`sudo tee /proc/sys/vm/drop_caches`, swallowed), the vanilla
+  DataFusion/Hyper/Polars install-time `sudo apt-get` (skipped — those deps must
+  be pre-installed, see below), and questdb's `sudo du` for data-size (run
+  unprivileged on your own `~/.questdb`). Anything else is forwarded to the real
+  sudo in non-interactive mode so it fails fast instead of hanging. Set
   `BENCH_REAL_DROP_CACHES=1` to restore real cold runs (that needs passwordless
   sudo for `tee /proc/sys/vm/drop_caches`).
 - **Scenario-2 ClickHouse and CrateDB run rootless** (user-mode), so they need
@@ -91,11 +96,14 @@ This is validated end-to-end against the real engines on a tiny parquet; see
   as your user (local data dir + config, parquet read in place) and CrateDB from
   its tarball (`bin/crate`, not apt/systemctl). The vanilla per-query restart is
   preserved. Both are validated end-to-end including cross-restart persistence.
-- The only remaining `sudo` is a few **one-time** install prompts: DuckDB's
-  `/usr/local/bin/duckdb` symlink, CrateDB's `postgresql-client` (psql) if absent,
-  and (vanilla DataFusion's) Rust/`gcc`. Pre-installing `python3-venv gcc git
-  postgresql-client` and symlinking duckdb yourself avoids all of them — none are
-  per-query, so passwordless sudo is never required.
+- With `python3-venv gcc git postgresql-client` pre-installed and a `duckdb`
+  binary already on your `PATH`, there are **zero** sudo prompts: the shim skips
+  the install-time `apt-get`, and the vanilla DuckDB install's `sudo ln` symlink
+  is guarded behind `command -v duckdb` so it never runs. (In a sandbox that
+  blocks `curl | sh`, stage the engine binaries yourself — `duckdb` on PATH and a
+  `clickhouse` binary in the `clickhouse*/` engine dirs — so the install scripts'
+  fetch step is skipped by their `if`-guards.) None of this is per-query, so
+  passwordless sudo is never required.
 - Disk: the parquet dataset is ~15 GB; QuestDB's CSV load needs ~70 GB
   uncompressed transiently. Budget ~120 GB free.
 - Engines install themselves on first run: vanilla engines via ClickBench's own

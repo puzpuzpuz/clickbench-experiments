@@ -1,26 +1,57 @@
 #!/bin/bash
 # A `sudo` shim placed first on PATH by the run drivers.
 #
-# We report HOT runs only. ClickBench's cold-run machinery flushes the OS page
-# cache before each query's FIRST run via:
-#     echo 3 | sudo tee /proc/sys/vm/drop_caches
-# That flush only affects the (discarded) cold run — hot runs are warm either
-# way — so we no-op it here. This removes the single per-query sudo call and so
-# the passwordless-sudo requirement, with ZERO effect on hot-run scores.
+# The whole point of this repo's rootless setup is that NONE of the per-query
+# or per-run privileged steps are actually necessary for hot-run scores. This
+# shim makes that true by intercepting the few `sudo` calls the upstream
+# ClickBench install/run scripts still make, so the benchmarks run with no
+# passwordless sudo at all. Everything it intercepts is provably a no-op (or
+# works fine unprivileged) for our hot-run-only purpose:
 #
-# Everything else (e.g. `sudo clickhouse start`) is forwarded unchanged to the
-# real sudo, so any genuine privileged step still works exactly as before.
+#  1. `sudo tee /proc/sys/vm/drop_caches` — ClickBench's cold-cache flush. It
+#     only affects the discarded cold run; hot runs are warm either way. No-op.
 #
-# Tied to the pinned ClickBench commit's exact drop_caches invocation; opt out
-# entirely with BENCH_REAL_DROP_CACHES=1 (the drivers then don't add this shim).
+#  2. `sudo apt-get ...` — the vanilla DataFusion/Hyper/Polars installs run an
+#     unconditional `apt-get` for build/runtime deps (gcc, git, python3-venv,
+#     python3-pip, postgresql-client). We require those to be pre-installed
+#     (see README "Requirements"), so the package step is a no-op here. If a
+#     dep is genuinely missing the later unprivileged step (venv create, build)
+#     fails loudly with a clear error — better than hanging on a sudo prompt.
+#
+#  3. `sudo du ...` — questdb's data-size reports DB size from the user's own
+#     ~/.questdb; it needs no privilege, so we just run `du` directly.
+#
+# Anything else is forwarded to the real sudo in NON-INTERACTIVE mode (`-n`),
+# so a genuinely-needed privileged step fails fast with a visible error
+# instead of silently hanging on a password prompt inside a background run.
+#
+# Opt out of the whole shim with BENCH_REAL_DROP_CACHES=1 (the drivers then
+# don't add it to PATH, restoring real cold runs / real sudo).
 
-if [ "${1:-}" = "tee" ] && [ "${2:-}" = "/proc/sys/vm/drop_caches" ]; then
-    cat >/dev/null 2>&1   # swallow the piped "3", do nothing, succeed
+cmd="${1:-}"
+
+# 1. cold-cache flush — swallow the piped "3", succeed.
+if [ "$cmd" = "tee" ] && [ "${2:-}" = "/proc/sys/vm/drop_caches" ]; then
+    cat >/dev/null 2>&1
     exit 0
 fi
 
+# 2. package installs — deps are pre-installed; no-op with a notice.
+if [ "$cmd" = "apt-get" ] || [ "$cmd" = "apt" ]; then
+    echo "nosudo shim: skipping 'sudo $*' (deps must be pre-installed; see README)" >&2
+    exit 0
+fi
+
+# 3. data-size du — runs fine unprivileged on the user's own data dir.
+if [ "$cmd" = "du" ]; then
+    shift
+    exec du "$@"
+fi
+
+# Everything else: try the real sudo non-interactively so it fails fast
+# instead of hanging on a password prompt.
 for real in /usr/bin/sudo /bin/sudo /usr/local/bin/sudo; do
-    if [ -x "$real" ]; then exec "$real" "$@"; fi
+    if [ -x "$real" ]; then exec "$real" -n "$@"; fi
 done
 echo "nosudo shim: real sudo not found on standard paths" >&2
 exit 1

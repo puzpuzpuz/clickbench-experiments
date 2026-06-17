@@ -5,7 +5,7 @@
 # postgresql-client to avoid even that prompt).
 set -eu
 
-CRATE_VERSION="${CRATE_VERSION:-5.10.10}"
+CRATE_VERSION="${CRATE_VERSION:-6.3.3}"
 
 if ! command -v psql >/dev/null 2>&1; then
     sudo apt-get update -y
