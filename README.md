@@ -50,13 +50,17 @@ Running it is how you find out — that's rather the point.)
 ### Scenario 2 — "Let Everyone Warm Up" (`scenario-2-native/`)
 
 Native storage queried by **DuckDB**, **ClickHouse**, **QuestDB**, and
-**CrateDB**, in three passes:
+**CrateDB**, in three passes that build on each other (the post's narrative
+order — vanilla, then warm everyone up, then keep DuckDB resident):
 - `original` — vanilla, 3 tries.
-- `modified` — keep DuckDB (the only fresh-process engine) alive.
-- `warmup` — 10 tries for everyone so JIT engines (JVM-based QuestDB, CrateDB)
-  reach steady state, with the hot score taken as the best warm run. (A
+- `warmup` — 10 tries for everyone, **no keep-alive**, so JIT engines (JVM-based
+  QuestDB, CrateDB) reach steady state while AOT ClickHouse stays ~flat and
+  DuckDB (fresh process per try) can't warm. Hot score is the best warm run. (A
   100M-row scan passes HotSpot's C2 threshold in a try or two, so 10 is plenty;
   override with `WARMUP_TRIES`.)
+- `keepalive` — same 10 tries, but now also keep DuckDB (the only fresh-process
+  engine) alive. The daemons have no keep-alive overlay and are identical to
+  their `warmup` result, so this pass reuses it for them and only re-runs DuckDB.
 
 ## How the keep-alive is implemented
 
@@ -131,7 +135,7 @@ bash lib/selftest.sh                    # validate the keep-alive harness (no en
 MACHINE=ryzen9-7900 scenario-1-parquet/run.sh duckdb-parquet
 MACHINE=ryzen9-7900 scenario-1-parquet/run.sh
 
-# Scenario 2: original / keep-alive / warmup passes
+# Scenario 2: original / warmup (no keep-alive) / keepalive passes
 MACHINE=ryzen9-7900 scenario-2-native/run.sh
 
 # See the hot-run scores re-rank (lower is better):
@@ -139,9 +143,11 @@ lib/score.py scenario-1-parquet/results/original/*.json
 lib/score.py scenario-1-parquet/results/modified/*.json
 lib/score.py scenario-2-native/results/original/*.json
 lib/score.py scenario-2-native/results/warmup/*.json
+lib/score.py scenario-2-native/results/keepalive/*.json
 ```
 
-Results are written to `scenario-*/results/{original,modified,warmup}/<engine>.<machine>.json`
+Results are written to `scenario-1-parquet/results/{original,modified}/` and
+`scenario-2-native/results/{original,warmup,keepalive}/` as `<engine>.<machine>.json`
 in the ClickBench dashboard's schema. `lib/score.py` reproduces the dashboard's
 hot-run geometric-mean metric for whatever group of result files you pass (the
 per-query baseline is the best among them). To render the full interactive
@@ -186,9 +192,9 @@ scenario-1-parquet/
   modified/<engine>/          keep-alive overlay (start/stop/check/query/load + repl.env)
   results/{original,modified}/
 scenario-2-native/
-  run.sh                      original / keep-alive / warmup driver
-  modified/duckdb/            keep-alive overlay (only fresh-process engine here)
+  run.sh                      original / warmup / keepalive driver
+  keepalive/duckdb/           keep-alive overlay (only fresh-process engine here)
   rootless/{clickhouse,cratedb}/   user-mode (no-sudo) daemon overrides
   rootless/questdb/                version (9.4.3) + timeout/load override (PR #902)
-  results/{original,modified,warmup}/
+  results/{original,warmup,keepalive}/
 ```

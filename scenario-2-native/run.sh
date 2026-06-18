@@ -2,25 +2,28 @@
 #
 # Scenario 2 — "Let Everyone Warm Up".
 #
-# Native storage, three passes:
-#   original  vanilla, 3 tries.
-#   modified  M1: keep the only fresh-process engine (DuckDB) alive. The
-#             daemons (ClickHouse, QuestDB, CrateDB) are unchanged, so this
-#             pass only re-runs engines that actually have a keep-alive overlay.
-#   warmup    M2: 10 tries for ALL engines so JIT engines (JVM-based QuestDB,
-#             CrateDB) reach steady state; DuckDB stays kept-alive. The hot
-#             score is collapsed to the best warm run (--collapse-hot).
-#             (A 100M-row scan blows past HotSpot's C2 threshold in a try or
-#             two, so 10 is plenty; override with WARMUP_TRIES.)
+# Native storage, three passes in the post's narrative order — vanilla, then
+# warm everyone up, then keep DuckDB resident:
+#   original   vanilla, 3 tries, fresh process per query for DuckDB.
+#   warmup     10 tries for ALL engines, still fresh-process for DuckDB (NO
+#              keep-alive). JIT engines (JVM-based QuestDB, CrateDB) reach
+#              steady state; AOT ClickHouse stays ~flat; DuckDB can't warm
+#              without persistence. Hot score collapsed to the best warm run
+#              (--collapse-hot). (A 100M-row scan blows past HotSpot's C2
+#              threshold in a try or two, so 10 is plenty; override WARMUP_TRIES.)
+#   keepalive  10 tries AND keep the only fresh-process engine (DuckDB) alive via
+#              its keep-alive overlay. The daemons (ClickHouse, QuestDB, CrateDB)
+#              have no overlay and are byte-identical to their `warmup` result,
+#              so this pass reuses that for them and only re-runs DuckDB.
 #
-# Results -> results/{original,modified,warmup}/<engine>.<machine>.json.
+# Results -> results/{original,warmup,keepalive}/<engine>.<machine>.json.
 #
 # Usage:
 #   ./run.sh                                  # all engines, all passes
 #   ./run.sh duckdb                           # one engine, all passes
-#   PASSES="warmup" ./run.sh questdb          # one engine, one pass
+#   PASSES="warmup" ./run.sh duckdb           # one engine, one pass
 #
-# Env: CLICKBENCH_DIR, MACHINE (default ryzen9-7900), PASSES, WARMUP_TRIES (30).
+# Env: CLICKBENCH_DIR, MACHINE (default ryzen9-7900), PASSES, WARMUP_TRIES (10).
 set -euo pipefail
 
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -28,7 +31,7 @@ repo="$(cd "$here/.." && pwd)"
 CB="${CLICKBENCH_DIR:-$repo/clickbench}"
 MACHINE="${MACHINE:-ryzen9-7900}"
 DATE="$(date -u +%Y-%m-%d)"
-PASSES="${PASSES:-original modified warmup}"
+PASSES="${PASSES:-original warmup keepalive}"
 WARMUP_TRIES="${WARMUP_TRIES:-10}"
 
 ALL_ENGINES=(duckdb clickhouse questdb cratedb)
@@ -44,13 +47,13 @@ if [ -z "${BENCH_REAL_DROP_CACHES:-}" ]; then
     export PATH="$here/../lib/nosudo:$PATH"
 fi
 
-has_overlay()  { [ -d "$here/modified/$1" ]; }   # DuckDB keep-alive
+has_overlay()  { [ -d "$here/keepalive/$1" ]; }   # DuckDB keep-alive overlay
 has_rootless() { [ -d "$here/rootless/$1" ]; }   # ClickHouse/CrateDB user-mode (no sudo)
 
 apply_overlay() {
     local engine="$1"
     cp "$here/../lib/fifo-repl.sh" "$here/../lib/repl-engine.py" "$CB/lib/" 2>/dev/null || true
-    cp "$here/modified/$engine/"* "$CB/$engine/"
+    cp "$here/keepalive/$engine/"* "$CB/$engine/"
     chmod +x "$CB/$engine/"{install,start,stop,check,query,load} 2>/dev/null || true
 }
 
@@ -88,9 +91,9 @@ run_phase() {
 
     local overlay=no
     case "$pass" in
-        original) ;;
-        modified) has_overlay "$engine" && overlay=yes ;;
-        warmup)   has_overlay "$engine" && overlay=yes; tries="$WARMUP_TRIES"; collapse=(--collapse-hot) ;;
+        original)  ;;
+        warmup)    tries="$WARMUP_TRIES"; collapse=(--collapse-hot) ;;   # 10t, NO keep-alive
+        keepalive) has_overlay "$engine" && overlay=yes; tries="$WARMUP_TRIES"; collapse=(--collapse-hot) ;;
     esac
 
     local rootless=no
@@ -117,18 +120,19 @@ run_phase() {
 
 for engine in "${ENGINES[@]}"; do
     for pass in $PASSES; do
-        if [ "$pass" = "modified" ] && ! has_overlay "$engine"; then
-            # Daemon, unchanged by the keep-alive tweak — reuse its original
-            # result so the modified group is self-contained for scoring.
-            echo ">>> [modified] $engine — daemon, unchanged from original; reusing original result"
-            mkdir -p "$here/results/modified"
-            cp "$here/results/original/$engine."*.json "$here/results/modified/" 2>/dev/null || \
-                echo "    (no original result yet; run the original pass first)"
+        if [ "$pass" = "keepalive" ] && ! has_overlay "$engine"; then
+            # Daemon, no keep-alive overlay — byte-identical to its 10-try
+            # `warmup` result, so reuse that (no redundant 10-try daemon run)
+            # to keep the keepalive group self-contained for scoring.
+            echo ">>> [keepalive] $engine — daemon, no overlay; reusing its warmup result"
+            mkdir -p "$here/results/keepalive"
+            cp "$here/results/warmup/$engine."*.json "$here/results/keepalive/" 2>/dev/null || \
+                echo "    (no warmup result yet; run the warmup pass first)"
             continue
         fi
         run_phase "$engine" "$pass"
     done
 done
 
-echo "Done. Results under $here/results/{original,modified,warmup}/"
+echo "Done. Results under $here/results/{original,warmup,keepalive}/"
 echo "Tip: score a group with  ../lib/score.py results/original/*.json"
