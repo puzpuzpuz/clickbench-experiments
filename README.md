@@ -41,9 +41,11 @@ already runs as a persistent server.
 **Tweak:** keep each fresh-process engine alive across the repeated runs. For
 DuckDB this matters because `create.sql` enables `parquet_metadata_cache`, a
 cache a fresh-process-per-query harness can never warm — ClickBench enables a
-cache its own driver defeats. (Honest spoiler: **Hyper should barely move** —
-its per-call `HyperProcess`/`create.sql` tax is *outside* the timed region, so
-it's the experiment's control.)
+cache its own driver defeats. (We *expected* Hyper to be the inert control —
+its per-call `HyperProcess`/`create.sql` tax sits *outside* the timed region, so
+keeping it alive "shouldn't" help the recorded number. It didn't pan out that
+way: the timed query call *itself* carries first-query warmup in a fresh process.
+Running it is how you find out — that's rather the point.)
 
 ### Scenario 2 — "Let Everyone Warm Up" (`scenario-2-native/`)
 
@@ -72,8 +74,10 @@ from a FIFO** ("the analyst who left their REPL/notebook open"), and each
   speaks the same line protocol so the harness and parser are shared. Timing is
   still each engine's internal/execute number.
 
-This is validated end-to-end against the real engines on a tiny parquet; see
-`lib/selftest.sh` (transport, no engine needed).
+This is exercised end-to-end against the real engines on the full
+105-column `hits.parquet`/native datasets (the runs the post is built on);
+`lib/selftest.sh` separately validates the FIFO transport with a mock (no engine
+needed).
 
 ## Requirements
 
