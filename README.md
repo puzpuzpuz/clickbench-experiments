@@ -122,8 +122,13 @@ needed).
   uncompressed transiently. Budget ~120 GB free.
 - Engines install themselves on first run: vanilla engines via ClickBench's own
   per-engine `install`; the modified library engines create a local `myenv/` venv
-  (`pip install chdb` / `datafusion` / `tableauhyperapi`); scenario-2 ClickHouse
-  and CrateDB use the rootless installs (binary / tarball, no system package).
+  (`pip install chdb` / `datafusion==53.0.0` / `tableauhyperapi`); scenario-2
+  ClickHouse and CrateDB use the rootless installs (binary / tarball, no system
+  package). DataFusion is pinned to `53.0.0` (the PyPI bindings matching vanilla's
+  datafusion-cli tag `53.1.0`) so the keep-alive delta isn't a hidden version
+  bump; each scenario-1 keep-alive run also stamps the resolved engine build into
+  its result JSON as `engine_version` (chdb/tableauhyperapi still resolve to
+  pip-latest, so the stamp is how you see what actually ran).
 
 ## Quickstart
 

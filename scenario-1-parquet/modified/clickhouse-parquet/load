@@ -14,4 +14,8 @@ if ! repl_query ".load" >/dev/null 2>&1; then
     echo "load: .load (create.sql) failed in resident chdb session" >&2
     exit 1
 fi
+
+# Stamp the exact engine build into the result (parsed by lib/log-to-json.py).
+# chdb's package version determines the bundled ClickHouse it runs as.
+echo "Engine version: chdb $(myenv/bin/python3 -c 'import importlib.metadata as m; print(m.version("chdb"))' 2>/dev/null)"
 sync

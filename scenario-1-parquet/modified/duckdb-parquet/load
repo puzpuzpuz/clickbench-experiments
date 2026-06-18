@@ -16,4 +16,8 @@ if ! repl_query "$(cat create.sql)" >/dev/null 2>&1; then
     echo "load: failed to register hits view in resident session" >&2
     exit 1
 fi
+
+# Stamp the exact engine build into the result (parsed by lib/log-to-json.py).
+# Same `duckdb` binary the resident session runs.
+echo "Engine version: DuckDB $(duckdb --version 2>/dev/null | head -n1)"
 sync

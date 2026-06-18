@@ -46,6 +46,7 @@ load_time = 0
 data_size = 0
 qps = None
 err_ratio = None
+engine_version = None
 
 for line in sys.stdin:
     s = line.strip()
@@ -73,6 +74,12 @@ for line in sys.stdin:
     elif s.startswith("Concurrent error ratio:"):
         v = s.split(":", 1)[1].strip()
         err_ratio = None if v == "null" else float(v)
+    elif s.startswith("Engine version:"):
+        # Emitted by the keep-alive overlays' ./load so the result records the
+        # exact engine build that produced it (the library engines float to
+        # pip-latest unless pinned). Last one wins.
+        v = s.split(":", 1)[1].strip()
+        engine_version = v or None
 
 out = {
     "system": tpl["system"],
@@ -91,6 +98,8 @@ if qps is not None:
     out["concurrent_qps"] = qps
 if err_ratio is not None:
     out["concurrent_error_ratio"] = err_ratio
+if engine_version is not None:
+    out["engine_version"] = engine_version
 
 if len(results) != 43:
     sys.stderr.write(

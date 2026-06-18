@@ -13,4 +13,7 @@ if ! repl_query ".load" >/dev/null 2>&1; then
     echo "load: .load (create.sql) failed in resident Hyper session" >&2
     exit 1
 fi
+
+# Stamp the exact engine build into the result (parsed by lib/log-to-json.py).
+echo "Engine version: tableauhyperapi $(myenv/bin/python3 -c 'import importlib.metadata as m; print(m.version("tableauhyperapi"))' 2>/dev/null)"
 sync

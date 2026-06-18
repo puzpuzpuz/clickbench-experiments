@@ -8,4 +8,10 @@ if [ ! -d myenv ]; then
     python3 -m venv myenv
 fi
 myenv/bin/pip install --quiet --upgrade pip
-myenv/bin/pip install --quiet datafusion
+# Pin to match the vanilla engine version. Vanilla datafusion/install builds
+# datafusion-cli from the arrow-datafusion repo at tag 53.1.0; the matching
+# PyPI bindings release is 53.0.0 (datafusion-python tracks the core 53.x line
+# but doesn't publish a .1 patch). Pinning keeps modified-vs-original a pure
+# process-persistence delta instead of letting pip float to a newer major and
+# conflate the keep-alive effect with a version change.
+myenv/bin/pip install --quiet 'datafusion==53.0.0'
